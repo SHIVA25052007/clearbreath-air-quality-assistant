@@ -1,0 +1,8 @@
+{
+  "name": "ClearBreath",
+  "description": "GenAI-powered winter smog and urban air quality assistant helping families and communities adopt low-emission daily routines, indoor air quality hacks, and sustainable alternatives with clear direct impact metrics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
