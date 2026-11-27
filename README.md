@@ -32,3 +32,27 @@ npm test
 npm run lint
 npm run build
 ```
+
+## Chosen Vertical
+Urban Air Quality Assistant (Challenge 6).
+
+## Approach and Logic
+- Uses the selected city's air quality and weather data.
+- Considers household details such as home type, cooking fuel, commute, air filtration and health sensitivities.
+- Finds a lower-PM2.5 2-hour window for airing the home from the hourly forecast.
+- Estimates the impact of the user's selected choices.
+- Sends this context to Gemini to generate tailored advice.
+
+## How the Solution Works
+1. Search for a city or pick a preset.
+2. Enter household and lifestyle details.
+3. Select choices in the Impact Simulator.
+4. Generate an AI action plan or ask the advisor a question.
+
+## Assumptions and Limitations
+- Live data comes from Open-Meteo and may be cached or differ from conditions at your home.
+- Preset reference values are not live readings.
+- Some missing values may be filled with defaults or estimates.
+- Exposure and emissions figures are estimates, not measurements.
+- AI advice can be wrong and is not medical advice.
+- AI features require a Gemini API key on the server.
