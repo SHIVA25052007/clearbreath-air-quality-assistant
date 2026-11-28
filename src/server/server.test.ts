@@ -20,6 +20,7 @@ import {
   generateTailoredActionPlan,
   isGeminiConfigured,
   parseActionPlanJson,
+  sanitizeGeminiLogMessage,
   type GeminiModelClient,
 } from './services/geminiService.ts';
 
@@ -304,10 +305,23 @@ test('geminiService helpers format errors, check config, summarize context, and 
   }
 
   assert.equal(formatGeminiError({ status: 400 }).status, 400);
+  assert.equal(formatGeminiError({ status: 401 }).status, 401);
   assert.equal(formatGeminiError({ status: 403 }).status, 403);
   assert.equal(formatGeminiError({ status: 429 }).status, 429);
+  assert.equal(formatGeminiError({ status: 503 }).status, 503);
+  assert.ok(formatGeminiError({ status: 503 }).message.includes('temporarily busy'));
+  assert.equal(formatGeminiError({ status: 504 }).status, 504);
+  assert.equal(formatGeminiError(Object.assign(new Error('timed out'), { name: 'TimeoutError' })).status, 504);
   assert.equal(formatGeminiError({ status: 404 }).status, 502);
   assert.equal(formatGeminiError(new Error('network reset')).status, 502);
+
+  const sanitizedMsg = sanitizeGeminiLogMessage(
+    'Failed calling https://generativelanguage.googleapis.com?key=secret123 AIza' + 'x'.repeat(35) + ' Bearer tok_abc'
+  );
+  assert.ok(!sanitizedMsg.includes('secret123'));
+  assert.ok(!sanitizedMsg.includes('AIzaSy'));
+  assert.ok(!sanitizedMsg.includes('tok_abc'));
+  assert.ok(sanitizedMsg.includes('[REDACTED]'));
 
   assert.equal(parseActionPlanJson('{bad-json').ok, false);
   assert.equal(parseActionPlanJson('["not-an-object"]').ok, false);
@@ -395,6 +409,49 @@ test('generateTailoredActionPlan and askAirQualityAdvisor handle missing client,
   assert.equal(planSuccess.ok, true);
   assert.ok(capturedPrompt.includes('<household_telemetry_context>'));
   assert.ok(!capturedPrompt.includes('<script>'));
+
+  // 429 quota errors should fail promptly without burning extra retry calls
+  let rateLimitCalls = 0;
+  const rateLimitedClient: GeminiModelClient = {
+    models: {
+      async generateContent() {
+        rateLimitCalls += 1;
+        throw Object.assign(new Error('RESOURCE_EXHAUSTED'), { status: 429 });
+      },
+    },
+  };
+  const rateLimitResult = await generateTailoredActionPlan({
+    telemetry: sampleTelemetry,
+    profile: sampleProfile,
+    impact: sampleImpact,
+    adoptedTitles: [],
+    client: rateLimitedClient,
+  });
+  assert.equal(rateLimitCalls, 1);
+  assert.equal(rateLimitResult.ok, false);
+  if (!rateLimitResult.ok) assert.equal(rateLimitResult.status, 429);
+
+  // Timeout errors should return 504 without repeating a full 45s wait
+  let timeoutCalls = 0;
+  const timeoutClient: GeminiModelClient = {
+    models: {
+      async generateContent() {
+        timeoutCalls += 1;
+        throw Object.assign(new Error('The operation timed out.'), { name: 'TimeoutError' });
+      },
+    },
+  };
+  const timeoutResult = await askAirQualityAdvisor({
+    message: 'Help?',
+    history: [],
+    telemetry: sampleTelemetry,
+    profile: sampleProfile,
+    impact: sampleImpact,
+    client: timeoutClient,
+  });
+  assert.equal(timeoutCalls, 1);
+  assert.equal(timeoutResult.ok, false);
+  if (!timeoutResult.ok) assert.equal(timeoutResult.status, 504);
 
   let capturedContents: unknown = null;
   const chatClient: GeminiModelClient = {

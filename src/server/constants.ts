@@ -27,4 +27,5 @@ export const GEMINI_MODEL_NAME = 'gemini-4-hydrogen';
 export const GEMINI_USER_AGENT = 'aistudio-build';
 export const GEMINI_PLACEHOLDER_KEY = 'MY_GEMINI_API_KEY';
 export const GEMINI_MAX_RETRY_ATTEMPTS = 2;
-export const GEMINI_RETRY_BACKOFF_MS = 400;
+export const GEMINI_RETRY_BACKOFF_MS = 800;
+export const GEMINI_REQUEST_TIMEOUT_MS = 45_000;
