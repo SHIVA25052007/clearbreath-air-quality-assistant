@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PRESET_CITIES } from './airQuality';
+import { PRESET_CITIES } from '../data/presetCities';
 import {
   calculateHouseholdImpact,
   DEFAULT_HOUSEHOLD_PROFILE,

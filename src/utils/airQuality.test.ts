@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { PRESET_CITIES } from '../data/presetCities';
 import {
   aggregateDailyTrend,
   computeWinterInversionRisk,
   estimateUsAqiFromPm25,
   findCleanestVentilationWindow,
   getAqiCategory,
-  PRESET_CITIES,
 } from './airQuality';
 
 test('getAqiCategory maps EPA thresholds accurately with non-hue labels', () => {

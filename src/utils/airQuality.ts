@@ -2,9 +2,15 @@ import type {
   AqiCategoryInfo,
   DailyTrendPoint,
   HourlyForecastPoint,
-  LocationTelemetry,
   VentilationWindow,
 } from '../types/airQuality';
+
+export const WHO_PM25_24H_GUIDELINE_UG_M3 = 15;
+export const US_AQI_SENSITIVE_THRESHOLD = 100;
+
+export function roundToOneDecimal(value: number): number {
+  return Math.round(value * 10) / 10;
+}
 
 export function getAqiCategory(usAqi: number): AqiCategoryInfo {
   const safeAqi = Number.isFinite(usAqi) ? Math.max(0, Math.round(usAqi)) : 0;
@@ -123,7 +129,7 @@ export function findCleanestVentilationWindow(
   const second = hourly[bestIdx + 1];
   const avgPm25 = Math.round((first.pm25 + second.pm25) / 2);
   const avgUsAqi = Math.round((first.usAqi + second.usAqi) / 2);
-  const avgWind = Math.round(((first.windKmh + second.windKmh) / 2) * 10) / 10;
+  const avgWind = roundToOneDecimal((first.windKmh + second.windKmh) / 2);
 
   return {
     startLabel: first.hourLabel,
@@ -158,7 +164,7 @@ export function computeWinterInversionRisk(
   return 'Low';
 }
 
-function buildHourlyCurve(
+export function buildHourlyCurve(
   basePm25: number,
   baseWind: number,
   baseTemp: number
@@ -174,8 +180,8 @@ function buildHourlyCurve(
 
   const startDate = new Date('2026-11-27T00:00:00Z');
   return multipliers.map((mult, hour) => {
-    const pm25 = Math.round(basePm25 * mult * 10) / 10;
-    const pm10 = Math.round(pm25 * 1.68 * 10) / 10;
+    const pm25 = roundToOneDecimal(basePm25 * mult);
+    const pm10 = roundToOneDecimal(pm25 * 1.68);
     const usAqi = estimateUsAqiFromPm25(pm25);
     const windShift = hour >= 12 && hour <= 16 ? 1.45 : hour >= 20 || hour <= 6 ? 0.72 : 1.0;
     const tempShift = hour >= 12 && hour <= 16 ? 5 : hour >= 2 && hour <= 7 ? -3 : 0;
@@ -186,8 +192,8 @@ function buildHourlyCurve(
       pm25,
       pm10,
       usAqi,
-      windKmh: Math.round(baseWind * windShift * 10) / 10,
-      tempC: Math.round((baseTemp + tempShift) * 10) / 10,
+      windKmh: roundToOneDecimal(baseWind * windShift),
+      tempC: roundToOneDecimal(baseTemp + tempShift),
     };
   });
 }
@@ -268,8 +274,8 @@ export function aggregateDailyTrend(
       dateIso,
       dayLabel,
       shortDate,
-      avgPm25: Math.round(avgPm * 10) / 10,
-      peakPm25: Math.round(peakPm * 10) / 10,
+      avgPm25: roundToOneDecimal(avgPm),
+      peakPm25: roundToOneDecimal(peakPm),
       avgUsAqi: Math.round(avgAq),
       peakUsAqi: Math.round(peakAq),
     };
@@ -284,8 +290,8 @@ export function buildWeeklyTrend(basePm25: number): DailyTrendPoint[] {
     const dayMs = endDateMs - (factors.length - 1 - idx) * 86400 * 1000;
     const dateIso = new Date(dayMs).toISOString().slice(0, 10);
     const { dayLabel, shortDate } = formatDateLabels(dateIso);
-    const avgPm25 = Math.round(basePm25 * factor * 10) / 10;
-    const peakPm25 = Math.round(avgPm25 * 1.32 * 10) / 10;
+    const avgPm25 = roundToOneDecimal(basePm25 * factor);
+    const peakPm25 = roundToOneDecimal(avgPm25 * 1.32);
     return {
       dateIso,
       dayLabel,
@@ -297,150 +303,3 @@ export function buildWeeklyTrend(basePm25: number): DailyTrendPoint[] {
     };
   });
 }
-
-export const PRESET_CITIES: LocationTelemetry[] = [
-  {
-    city: 'New Delhi',
-    region: 'Delhi NCR',
-    country: 'India',
-    latitude: 28.6139,
-    longitude: 77.209,
-    timezone: 'Asia/Kolkata',
-    observedAtIso: '2026-11-27T10:30:00Z',
-    usAqi: 248,
-    europeanAqi: 138,
-    pm25: 198.4,
-    pm10: 312.0,
-    no2: 64.2,
-    so2: 18.5,
-    o3: 32.0,
-    coUgM3: 1420,
-    tempC: 11.4,
-    windKmh: 3.8,
-    humidityPct: 74,
-    inversionRisk: 'Severe',
-    hourly: buildHourlyCurve(168, 4.2, 12),
-    weeklyTrend: buildWeeklyTrend(176),
-    dataSource: 'preset',
-  },
-  {
-    city: 'Lahore',
-    region: 'Punjab',
-    country: 'Pakistan',
-    latitude: 31.5497,
-    longitude: 74.3436,
-    timezone: 'Asia/Karachi',
-    observedAtIso: '2026-11-27T10:30:00Z',
-    usAqi: 271,
-    europeanAqi: 152,
-    pm25: 221.0,
-    pm10: 348.5,
-    no2: 59.0,
-    so2: 21.4,
-    o3: 29.0,
-    coUgM3: 1580,
-    tempC: 10.8,
-    windKmh: 3.1,
-    humidityPct: 79,
-    inversionRisk: 'Severe',
-    hourly: buildHourlyCurve(188, 3.4, 11),
-    weeklyTrend: buildWeeklyTrend(196),
-    dataSource: 'preset',
-  },
-  {
-    city: 'Salt Lake City',
-    region: 'Utah',
-    country: 'United States',
-    latitude: 40.7608,
-    longitude: -111.891,
-    timezone: 'America/Denver',
-    observedAtIso: '2026-11-27T10:30:00Z',
-    usAqi: 134,
-    europeanAqi: 68,
-    pm25: 48.6,
-    pm10: 76.2,
-    no2: 41.8,
-    so2: 6.2,
-    o3: 44.0,
-    coUgM3: 680,
-    tempC: -1.5,
-    windKmh: 4.5,
-    humidityPct: 68,
-    inversionRisk: 'High',
-    hourly: buildHourlyCurve(44, 5.2, -1),
-    weeklyTrend: buildWeeklyTrend(44),
-    dataSource: 'preset',
-  },
-  {
-    city: 'Milan',
-    region: 'Lombardy',
-    country: 'Italy',
-    latitude: 45.4642,
-    longitude: 9.19,
-    timezone: 'Europe/Rome',
-    observedAtIso: '2026-11-27T10:30:00Z',
-    usAqi: 156,
-    europeanAqi: 79,
-    pm25: 65.2,
-    pm10: 94.0,
-    no2: 52.4,
-    so2: 9.1,
-    o3: 28.0,
-    coUgM3: 790,
-    tempC: 5.2,
-    windKmh: 4.1,
-    humidityPct: 82,
-    inversionRisk: 'High',
-    hourly: buildHourlyCurve(58, 4.4, 5),
-    weeklyTrend: buildWeeklyTrend(58),
-    dataSource: 'preset',
-  },
-  {
-    city: 'Beijing',
-    region: 'Beijing',
-    country: 'China',
-    latitude: 39.9042,
-    longitude: 116.4074,
-    timezone: 'Asia/Shanghai',
-    observedAtIso: '2026-11-27T10:30:00Z',
-    usAqi: 162,
-    europeanAqi: 84,
-    pm25: 76.5,
-    pm10: 118.4,
-    no2: 49.5,
-    so2: 14.0,
-    o3: 36.0,
-    coUgM3: 940,
-    tempC: 2.0,
-    windKmh: 6.2,
-    humidityPct: 54,
-    inversionRisk: 'High',
-    hourly: buildHourlyCurve(68, 6.8, 2),
-    weeklyTrend: buildWeeklyTrend(68),
-    dataSource: 'preset',
-  },
-  {
-    city: 'London',
-    region: 'Greater London',
-    country: 'United Kingdom',
-    latitude: 51.5074,
-    longitude: -0.1278,
-    timezone: 'Europe/London',
-    observedAtIso: '2026-11-27T10:30:00Z',
-    usAqi: 64,
-    europeanAqi: 34,
-    pm25: 18.2,
-    pm10: 29.5,
-    no2: 33.4,
-    so2: 4.5,
-    o3: 48.0,
-    coUgM3: 410,
-    tempC: 7.5,
-    windKmh: 14.2,
-    humidityPct: 76,
-    inversionRisk: 'Low',
-    hourly: buildHourlyCurve(17, 14.2, 7),
-    weeklyTrend: buildWeeklyTrend(17),
-    dataSource: 'preset',
-  },
-];

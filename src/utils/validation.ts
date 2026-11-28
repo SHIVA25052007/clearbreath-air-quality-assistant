@@ -54,6 +54,13 @@ const INVERSION_RISKS = new Set<LocationTelemetry['inversionRisk']>([
 
 const DATA_SOURCES = new Set<LocationTelemetry['dataSource']>(['live', 'preset']);
 
+const SAFE_GEO_LABEL_REGEX = /^[\p{L}\p{N}\s,.'\-/()]*$/u;
+const SAFE_TIMEZONE_REGEX = /^[A-Za-z0-9_/+:-]+$/;
+const ISO_DATETIME_REGEX =
+  /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const SAFE_ESTIMATED_FIELD_REGEX = /^[a-zA-Z0-9_.\-\s]{1,32}$/;
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -211,8 +218,8 @@ export function validateLocationTelemetry(
     return { valid: false, error: 'telemetry.city must be a string.' };
   }
   const city = sanitizeTextInput(raw.city, 80);
-  if (city.length < 1) {
-    return { valid: false, error: 'telemetry.city is required.' };
+  if (city.length < 1 || !SAFE_GEO_LABEL_REGEX.test(city)) {
+    return { valid: false, error: 'telemetry.city is required and must be a valid place name.' };
   }
 
   if (typeof raw.region !== 'string' || typeof raw.country !== 'string') {
@@ -220,6 +227,9 @@ export function validateLocationTelemetry(
   }
   const region = sanitizeTextInput(raw.region, 80);
   const country = sanitizeTextInput(raw.country, 80);
+  if (!SAFE_GEO_LABEL_REGEX.test(region) || !SAFE_GEO_LABEL_REGEX.test(country)) {
+    return { valid: false, error: 'telemetry.region or telemetry.country contains unsupported characters.' };
+  }
 
   if (!isFiniteInRange(raw.latitude, -90, 90) || !isFiniteInRange(raw.longitude, -180, 180)) {
     return { valid: false, error: 'telemetry coordinates are invalid.' };
@@ -230,8 +240,13 @@ export function validateLocationTelemetry(
   }
   const timezone = sanitizeTextInput(raw.timezone, 64);
   const observedAtIso = sanitizeTextInput(raw.observedAtIso, 40);
-  if (!timezone || !observedAtIso) {
-    return { valid: false, error: 'telemetry.timezone and telemetry.observedAtIso are required.' };
+  if (
+    !timezone ||
+    !SAFE_TIMEZONE_REGEX.test(timezone) ||
+    !observedAtIso ||
+    !ISO_DATETIME_REGEX.test(observedAtIso)
+  ) {
+    return { valid: false, error: 'telemetry.timezone and telemetry.observedAtIso must be valid.' };
   }
 
   if (
@@ -278,8 +293,8 @@ export function validateLocationTelemetry(
     }
     const timeIso = sanitizeTextInput(pt.timeIso, 40);
     const hourLabel = sanitizeTextInput(pt.hourLabel, 16);
-    if (!timeIso || !hourLabel) {
-      return { valid: false, error: 'telemetry.hourly entries require timeIso and hourLabel.' };
+    if (!timeIso || !ISO_DATETIME_REGEX.test(timeIso) || !hourLabel) {
+      return { valid: false, error: 'telemetry.hourly entries require valid timeIso and hourLabel.' };
     }
     if (
       !isFiniteInRange(pt.pm25, 0, 2000) ||
@@ -320,8 +335,8 @@ export function validateLocationTelemetry(
     const dateIso = sanitizeTextInput(day.dateIso, 20);
     const dayLabel = sanitizeTextInput(day.dayLabel, 16);
     const shortDate = sanitizeTextInput(day.shortDate, 20);
-    if (!dateIso || !dayLabel || !shortDate) {
-      return { valid: false, error: 'telemetry.weeklyTrend entries require date labels.' };
+    if (!dateIso || !ISO_DATE_REGEX.test(dateIso) || !dayLabel || !shortDate) {
+      return { valid: false, error: 'telemetry.weeklyTrend entries require valid date labels.' };
     }
     if (
       !isFiniteInRange(day.avgPm25, 0, 2000) ||
@@ -340,6 +355,25 @@ export function validateLocationTelemetry(
       avgUsAqi: day.avgUsAqi,
       peakUsAqi: day.peakUsAqi,
     });
+  }
+
+  let estimatedFields: string[] | undefined;
+  if (raw.estimatedFields !== undefined) {
+    if (!Array.isArray(raw.estimatedFields) || raw.estimatedFields.length > 15) {
+      return { valid: false, error: 'telemetry.estimatedFields must be an array of at most 15 items.' };
+    }
+    const sanitizedFields: string[] = [];
+    for (const field of raw.estimatedFields) {
+      if (typeof field !== 'string') {
+        return { valid: false, error: 'telemetry.estimatedFields must contain only strings.' };
+      }
+      const cleanedField = sanitizeTextInput(field, 32);
+      if (!cleanedField || !SAFE_ESTIMATED_FIELD_REGEX.test(cleanedField)) {
+        return { valid: false, error: 'telemetry.estimatedFields contains an invalid label.' };
+      }
+      sanitizedFields.push(cleanedField);
+    }
+    estimatedFields = sanitizedFields;
   }
 
   return {
@@ -367,6 +401,7 @@ export function validateLocationTelemetry(
       hourly,
       weeklyTrend,
       dataSource: raw.dataSource as LocationTelemetry['dataSource'],
+      ...(estimatedFields && estimatedFields.length > 0 ? { estimatedFields } : {}),
     },
   };
 }
@@ -416,6 +451,39 @@ export function validateImpactSummary(
   };
 }
 
+function validateAssistantContext(
+  raw: Record<string, unknown>
+):
+  | {
+      valid: true;
+      telemetry: LocationTelemetry;
+      profile: HouseholdProfile;
+      impact: ImpactSummary;
+    }
+  | { valid: false; error: string } {
+  const telemetryCheck = validateLocationTelemetry(raw.telemetry);
+  if (!telemetryCheck.valid) {
+    return telemetryCheck;
+  }
+
+  const profileCheck = validateHouseholdProfile(raw.profile);
+  if (!profileCheck.valid) {
+    return profileCheck;
+  }
+
+  const impactCheck = validateImpactSummary(raw.impact);
+  if (!impactCheck.valid) {
+    return impactCheck;
+  }
+
+  return {
+    valid: true,
+    telemetry: telemetryCheck.telemetry,
+    profile: profileCheck.profile,
+    impact: impactCheck.impact,
+  };
+}
+
 export function validateAssistantPlanRequest(
   raw: unknown
 ):
@@ -431,19 +499,9 @@ export function validateAssistantPlanRequest(
     return { valid: false, error: 'Request body must be a JSON object.' };
   }
 
-  const telemetryCheck = validateLocationTelemetry(raw.telemetry);
-  if (!telemetryCheck.valid) {
-    return telemetryCheck;
-  }
-
-  const profileCheck = validateHouseholdProfile(raw.profile);
-  if (!profileCheck.valid) {
-    return profileCheck;
-  }
-
-  const impactCheck = validateImpactSummary(raw.impact);
-  if (!impactCheck.valid) {
-    return impactCheck;
+  const contextCheck = validateAssistantContext(raw);
+  if (!contextCheck.valid) {
+    return contextCheck;
   }
 
   let adoptedTitles: string[] = [];
@@ -466,9 +524,9 @@ export function validateAssistantPlanRequest(
 
   return {
     valid: true,
-    telemetry: telemetryCheck.telemetry,
-    profile: profileCheck.profile,
-    impact: impactCheck.impact,
+    telemetry: contextCheck.telemetry,
+    profile: contextCheck.profile,
+    impact: contextCheck.impact,
     adoptedTitles,
   };
 }
@@ -494,19 +552,9 @@ export function validateAssistantChatRequest(
     return { valid: false, error: msgCheck.error ?? 'Invalid message.' };
   }
 
-  const telemetryCheck = validateLocationTelemetry(raw.telemetry);
-  if (!telemetryCheck.valid) {
-    return telemetryCheck;
-  }
-
-  const profileCheck = validateHouseholdProfile(raw.profile);
-  if (!profileCheck.valid) {
-    return profileCheck;
-  }
-
-  const impactCheck = validateImpactSummary(raw.impact);
-  if (!impactCheck.valid) {
-    return impactCheck;
+  const contextCheck = validateAssistantContext(raw);
+  if (!contextCheck.valid) {
+    return contextCheck;
   }
 
   const history: Array<{ role: 'Assistant' | 'Family'; text: string }> = [];
@@ -538,8 +586,8 @@ export function validateAssistantChatRequest(
     valid: true,
     message: msgCheck.message,
     history,
-    telemetry: telemetryCheck.telemetry,
-    profile: profileCheck.profile,
-    impact: impactCheck.impact,
+    telemetry: contextCheck.telemetry,
+    profile: contextCheck.profile,
+    impact: contextCheck.impact,
   };
 }

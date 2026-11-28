@@ -1,13 +1,19 @@
-import React from 'react';
+import { memo } from 'react';
 
 interface TopBarProps {
   onGeneratePlan: () => void;
   isGeneratingPlan: boolean;
 }
 
-export function TopBar({ onGeneratePlan, isGeneratingPlan }: TopBarProps) {
+export const TopBar = memo(function TopBar({ onGeneratePlan, isGeneratingPlan }: TopBarProps) {
   return (
     <header className="border-b border-slate-200 bg-white">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-3 focus:z-50 focus:rounded-md focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-xs focus:font-medium focus:text-white"
+      >
+        Skip to main content
+      </a>
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-8 px-4 py-3.5 sm:px-6 lg:px-8">
         <a
           href="#telemetry-section"
@@ -56,4 +62,4 @@ export function TopBar({ onGeneratePlan, isGeneratingPlan }: TopBarProps) {
       </div>
     </header>
   );
-}
+});

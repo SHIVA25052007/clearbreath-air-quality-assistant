@@ -4,6 +4,7 @@ import type {
   InterventionChoice,
   LocationTelemetry,
 } from '../types/airQuality';
+import { roundToOneDecimal } from './airQuality';
 
 export const DEFAULT_HOUSEHOLD_PROFILE: HouseholdProfile = {
   householdSize: 4,
@@ -205,8 +206,9 @@ export function calculateHouseholdImpact(
   const cookingSpike = indoorSourceByCooking[profile.cookingFuel];
   const existingPurifierFactor = purifierFactorBySetup[profile.purifierSetup];
 
-  const baselineIndoorPm25 =
-    Math.round((outdoorPm25 * baseInfiltration + cookingSpike) * existingPurifierFactor * 10) / 10;
+  const baselineIndoorPm25 = roundToOneDecimal(
+    (outdoorPm25 * baseInfiltration + cookingSpike) * existingPurifierFactor
+  );
 
   const selectedSet = new Set(selectedChoiceIds);
   const adoptedChoices = INTERVENTION_CATALOG.filter((c) => selectedSet.has(c.id));
@@ -234,8 +236,9 @@ export function calculateHouseholdImpact(
 
   // Clamp minimum indoor PM2.5 to realistic floor (3 µg/m³ or 12% of outdoor)
   const minFloor = Math.min(baselineIndoorPm25, Math.max(3.0, outdoorPm25 * 0.1));
-  const mitigatedIndoorPm25 =
-    Math.round(Math.max(minFloor, baselineIndoorPm25 * indoorMultiplier) * 10) / 10;
+  const mitigatedIndoorPm25 = roundToOneDecimal(
+    Math.max(minFloor, baselineIndoorPm25 * indoorMultiplier)
+  );
 
   const indoorReductionPct =
     baselineIndoorPm25 > 0
@@ -270,21 +273,23 @@ export function calculateHouseholdImpact(
 
   // Berkeley Earth approximation: ~22 µg/m³ for 24h (~308 µg inhaled) ≈ 1 cigarette
   const ugPerCigarette = 308;
-  const cigaretteEquivalentsBaseline =
-    Math.round((baselineDailyDoseUg / ugPerCigarette) * 10) / 10;
-  const cigaretteEquivalentsMitigated =
-    Math.round((mitigatedDailyDoseUg / ugPerCigarette) * 10) / 10;
+  const cigaretteEquivalentsBaseline = roundToOneDecimal(baselineDailyDoseUg / ugPerCigarette);
+  const cigaretteEquivalentsMitigated = roundToOneDecimal(mitigatedDailyDoseUg / ugPerCigarette);
   const cigaretteEquivalentsAvoided = Math.max(
     0,
-    Math.round((cigaretteEquivalentsBaseline - cigaretteEquivalentsMitigated) * 10) / 10
+    roundToOneDecimal(cigaretteEquivalentsBaseline - cigaretteEquivalentsMitigated)
   );
 
   const householdFactor = Math.max(1, Math.min(8, profile.householdSize)) / 4;
-  const scaledWeeklyCo2 = Math.round(weeklyCo2AvoidedKg * Math.max(0.75, householdFactor * 0.85) * 10) / 10;
-  const scaledWeeklyPm = Math.round(weeklyPmAvoidedGrams * Math.max(0.75, householdFactor * 0.85) * 10) / 10;
+  const scaledWeeklyCo2 = roundToOneDecimal(
+    weeklyCo2AvoidedKg * Math.max(0.75, householdFactor * 0.85)
+  );
+  const scaledWeeklyPm = roundToOneDecimal(
+    weeklyPmAvoidedGrams * Math.max(0.75, householdFactor * 0.85)
+  );
 
   return {
-    outdoorPm25: Math.round(outdoorPm25 * 10) / 10,
+    outdoorPm25: roundToOneDecimal(outdoorPm25),
     baselineIndoorPm25,
     mitigatedIndoorPm25,
     indoorReductionPct,
@@ -296,6 +301,6 @@ export function calculateHouseholdImpact(
     cigaretteEquivalentsAvoided,
     weeklyCo2AvoidedKg: scaledWeeklyCo2,
     weeklyPmAvoidedGrams: scaledWeeklyPm,
-    winterSeasonCo2AvoidedKg: Math.round(scaledWeeklyCo2 * 13 * 10) / 10, // ~13-week winter smog season
+    winterSeasonCo2AvoidedKg: roundToOneDecimal(scaledWeeklyCo2 * 13), // ~13-week winter smog season
   };
 }

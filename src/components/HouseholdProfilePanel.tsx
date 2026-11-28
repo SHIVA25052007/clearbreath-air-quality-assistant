@@ -1,4 +1,4 @@
-import React from 'react';
+import { memo } from 'react';
 import type {
   CommuteModeType,
   CookingFuelType,
@@ -20,7 +20,7 @@ const SENSITIVITY_OPTIONS: Array<{ id: SensitivityGroup; label: string }> = [
   { id: 'outdoor_athletes', label: 'Outdoor Runners / Workers' },
 ];
 
-export function HouseholdProfilePanel({
+export const HouseholdProfilePanel = memo(function HouseholdProfilePanel({
   profile,
   onChange,
 }: HouseholdProfilePanelProps) {
@@ -47,7 +47,7 @@ export function HouseholdProfilePanel({
               Tailor exposure baselines, indoor infiltration, and AI advice to how your household lives and commutes.
             </p>
           </div>
-          <span className="font-mono text-xs text-slate-500 tabular-nums">
+          <span className="font-mono text-xs text-slate-600 tabular-nums">
             Saved locally in browser
           </span>
         </div>
@@ -211,4 +211,4 @@ export function HouseholdProfilePanel({
       </div>
     </section>
   );
-}
+});

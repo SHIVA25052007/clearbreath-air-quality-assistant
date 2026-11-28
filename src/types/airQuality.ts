@@ -60,6 +60,7 @@ export interface LocationTelemetry {
   hourly: HourlyForecastPoint[];
   weeklyTrend: DailyTrendPoint[];
   dataSource: 'live' | 'preset';
+  estimatedFields?: string[];
 }
 
 export type HomeEnclosureType =

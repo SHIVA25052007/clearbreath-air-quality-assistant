@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
-import { Check, ChevronDown, ChevronUp, ShieldCheck, Leaf } from 'lucide-react';
+import { memo, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { Check, ChevronDown, ChevronUp, ShieldCheck } from 'lucide-react';
 import type {
   ImpactSummary,
   InterventionCategory,
   InterventionChoice,
 } from '../types/airQuality';
 import { INTERVENTION_CATALOG } from '../utils/impactCalculator';
+import { HouseholdImpactCard } from './HouseholdImpactCard';
 
 interface ImpactLabSectionProps {
   selectedChoiceIds: string[];
@@ -13,6 +14,7 @@ interface ImpactLabSectionProps {
   onResetChoices: () => void;
   impact: ImpactSummary;
   cityName: string;
+  isReferenceCity: boolean;
 }
 
 type FilterTab = 'all' | InterventionCategory;
@@ -59,6 +61,10 @@ function ResilientEditorialImage({
         <img
           src={src}
           alt={alt}
+          width={896}
+          height={500}
+          loading="lazy"
+          decoding="async"
           referrerPolicy="no-referrer"
           onError={() => setFailed(true)}
           className="aspect-video w-full object-cover"
@@ -71,29 +77,39 @@ function ResilientEditorialImage({
   );
 }
 
-export function ImpactLabSection({
+export const ImpactLabSection = memo(function ImpactLabSection({
   selectedChoiceIds,
   onToggleChoice,
   onResetChoices,
   impact,
   cityName,
+  isReferenceCity,
 }: ImpactLabSectionProps) {
   const [activeTab, setActiveTab] = useState<FilterTab>('all');
   const [expandedId, setExpandedId] = useState<string | null>('indoor_corsi_rosenthal');
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
-  const selectedSet = new Set(selectedChoiceIds);
-  const visibleChoices =
-    activeTab === 'all'
-      ? INTERVENTION_CATALOG
-      : INTERVENTION_CATALOG.filter((item) => item.category === activeTab);
+  const selectedSet = useMemo(() => new Set(selectedChoiceIds), [selectedChoiceIds]);
+  const visibleChoices = useMemo(
+    () =>
+      activeTab === 'all'
+        ? INTERVENTION_CATALOG
+        : INTERVENTION_CATALOG.filter((item) => item.category === activeTab),
+    [activeTab]
+  );
 
-  const maxDose = Math.max(100, impact.baselineDailyDoseUg);
-  const baselineBarPct = Math.min(100, Math.round((impact.baselineDailyDoseUg / maxDose) * 100));
-  const mitigatedBarPct = Math.min(100, Math.round((impact.mitigatedDailyDoseUg / maxDose) * 100));
+  const handleTabKeyDown = (idx: number, e: KeyboardEvent<HTMLButtonElement>) => {
+    let nextIdx = idx;
+    if (e.key === 'ArrowRight') nextIdx = (idx + 1) % FILTER_TABS.length;
+    else if (e.key === 'ArrowLeft') nextIdx = (idx - 1 + FILTER_TABS.length) % FILTER_TABS.length;
+    else if (e.key === 'Home') nextIdx = 0;
+    else if (e.key === 'End') nextIdx = FILTER_TABS.length - 1;
+    else return;
 
-  const maxIndoor = Math.max(20, impact.baselineIndoorPm25);
-  const indoorBasePct = Math.min(100, Math.round((impact.baselineIndoorPm25 / maxIndoor) * 100));
-  const indoorMitPct = Math.min(100, Math.round((impact.mitigatedIndoorPm25 / maxIndoor) * 100));
+    e.preventDefault();
+    setActiveTab(FILTER_TABS[nextIdx].id);
+    tabRefs.current[nextIdx]?.focus();
+  };
 
   return (
     <section
@@ -107,7 +123,7 @@ export function ImpactLabSection({
             02. Direct Impact Simulator
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            Select routines, indoor air hacks, and low-emission swaps to see exactly how much fine particulate exposure and winter pollution your household eliminates.
+            Select routines, indoor air hacks, and low-emission swaps to estimate how much fine particulate exposure and winter pollution your household avoids.
           </p>
         </div>
 
@@ -116,15 +132,22 @@ export function ImpactLabSection({
           aria-label="Filter clean-air interventions"
           className="inline-flex flex-wrap items-center gap-1 rounded-lg bg-slate-100 p-1"
         >
-          {FILTER_TABS.map((tab) => {
+          {FILTER_TABS.map((tab, idx) => {
             const selected = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
+                ref={(el) => {
+                  tabRefs.current[idx] = el;
+                }}
+                id={`impact-tab-${tab.id}`}
                 type="button"
                 role="tab"
                 aria-selected={selected}
+                aria-controls="impact-choices-panel"
+                tabIndex={selected ? 0 : -1}
                 onClick={() => setActiveTab(tab.id)}
+                onKeyDown={(e) => handleTabKeyDown(idx, e)}
                 className={`min-h-[36px] rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors ${
                   selected
                     ? 'bg-white text-slate-900 shadow-xs'
@@ -140,7 +163,12 @@ export function ImpactLabSection({
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
         {/* Left: Interactive Choices List */}
-        <div className="lg:col-span-7 divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white">
+        <div
+          id="impact-choices-panel"
+          role="tabpanel"
+          aria-labelledby={`impact-tab-${activeTab}`}
+          className="lg:col-span-7 divide-y divide-slate-200 rounded-xl border border-slate-200 bg-white"
+        >
           {visibleChoices.map((choice: InterventionChoice) => {
             const isAdopted = selectedSet.has(choice.id);
             const isExpanded = expandedId === choice.id;
@@ -160,7 +188,7 @@ export function ImpactLabSection({
               <div key={choice.id} className="p-5 transition-colors hover:bg-slate-50/60">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
                       <span className="font-medium text-teal-800">
                         {categoryHumanLabel(choice.category)}
                       </span>
@@ -203,7 +231,7 @@ export function ImpactLabSection({
 
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2 pt-2">
                   <p className="text-xs leading-relaxed text-slate-700">
-                    <span className="font-semibold text-slate-900">Direct impact: </span>
+                    <span className="font-semibold text-slate-900">Estimated impact: </span>
                     {choice.directImpactExplanation}
                   </p>
 
@@ -211,7 +239,7 @@ export function ImpactLabSection({
                     type="button"
                     aria-expanded={isExpanded}
                     onClick={() => setExpandedId(isExpanded ? null : choice.id)}
-                    className="inline-flex min-h-[32px] items-center gap-1 text-xs font-medium text-teal-800 hover:underline whitespace-nowrap shrink-0"
+                    className="inline-flex min-h-[36px] items-center gap-1 text-xs font-medium text-teal-800 hover:underline whitespace-nowrap shrink-0"
                   >
                     {isExpanded ? 'Hide steps' : 'Action steps'}
                     {isExpanded ? (
@@ -238,138 +266,13 @@ export function ImpactLabSection({
 
         {/* Right: Direct Impact Readout + Visual Field Guides */}
         <div className="lg:col-span-5 space-y-6">
-          <div className="rounded-xl border border-slate-200 bg-white p-6">
-            <div className="flex items-baseline justify-between gap-2 border-b border-slate-100 pb-4">
-              <div>
-                <h3 className="text-base font-semibold text-slate-900">
-                  Your Household Impact in {cityName}
-                </h3>
-                <p className="mt-0.5 text-xs text-slate-500">
-                  {selectedChoiceIds.length} active choice{selectedChoiceIds.length === 1 ? '' : 's'} modeled against {impact.outdoorPm25} µg/m³ outdoor PM2.5
-                </p>
-              </div>
-              {selectedChoiceIds.length > 0 && (
-                <button
-                  type="button"
-                  onClick={onResetChoices}
-                  className="text-xs font-medium text-slate-600 hover:text-slate-900 hover:underline whitespace-nowrap shrink-0"
-                >
-                  Clear all
-                </button>
-              )}
-            </div>
-
-            {/* Dose Reduction Comparison */}
-            <div className="mt-5 space-y-4">
-              <div>
-                <div className="flex items-baseline justify-between text-xs">
-                  <span className="font-medium text-slate-700">Daily Inhaled PM2.5 Dose</span>
-                  <span className="font-mono font-semibold text-teal-800 tabular-nums" data-testid="dose-reduction-pct">
-                    -{impact.doseReductionPct}% exposure
-                  </span>
-                </div>
-                <div className="mt-2 space-y-2">
-                  <div>
-                    <div className="flex justify-between text-xs text-slate-500">
-                      <span>Unmitigated baseline</span>
-                      <span className="font-mono tabular-nums">{impact.baselineDailyDoseUg} µg/day</span>
-                    </div>
-                    <div className="mt-1 h-2.5 w-full overflow-hidden rounded-sm bg-slate-100">
-                      <div
-                        className="h-full bg-slate-400 transition-all duration-200"
-                        style={{ width: `${baselineBarPct}%` }}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between text-xs text-slate-900 font-medium">
-                      <span>With your choices</span>
-                      <span className="font-mono tabular-nums" data-testid="mitigated-dose-ug">
-                        {impact.mitigatedDailyDoseUg} µg/day
-                      </span>
-                    </div>
-                    <div className="mt-1 h-2.5 w-full overflow-hidden rounded-sm bg-slate-100">
-                      <div
-                        className="h-full bg-teal-700 transition-all duration-200"
-                        style={{ width: `${mitigatedBarPct}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="border-t border-slate-100 pt-4">
-                <div className="flex items-baseline justify-between text-xs">
-                  <span className="font-medium text-slate-700">Indoor Living Room PM2.5</span>
-                  <span className="font-mono font-semibold text-teal-800 tabular-nums">
-                    -{impact.indoorReductionPct}% indoors
-                  </span>
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-xs text-slate-500">Without hacks</p>
-                    <p className="mt-0.5 font-mono text-lg font-semibold text-slate-700 tabular-nums">
-                      {impact.baselineIndoorPm25} <span className="text-xs font-normal">µg/m³</span>
-                    </p>
-                    <div className="mt-1 h-1.5 w-full rounded-sm bg-slate-100">
-                      <div
-                        className="h-full bg-slate-400"
-                        style={{ width: `${indoorBasePct}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-700 font-medium">With your plan</p>
-                    <p className="mt-0.5 font-mono text-lg font-semibold text-teal-800 tabular-nums" data-testid="mitigated-indoor-pm25">
-                      {impact.mitigatedIndoorPm25} <span className="text-xs font-normal">µg/m³</span>
-                    </p>
-                    <div className="mt-1 h-1.5 w-full rounded-sm bg-slate-100">
-                      <div
-                        className="h-full bg-teal-700"
-                        style={{ width: `${indoorMitPct}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3 border-t border-slate-100 pt-4">
-                <div>
-                  <p className="text-xs text-slate-500">Lung Burden Saved</p>
-                  <p className="mt-1 font-mono text-base font-semibold text-slate-900 tabular-nums">
-                    {impact.cigaretteEquivalentsAvoided}
-                  </p>
-                  <p className="text-[11px] text-slate-500">cig-eq / day avoided</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500">Weekly CO₂e Cut</p>
-                  <p className="mt-1 font-mono text-base font-semibold text-slate-900 tabular-nums" data-testid="weekly-co2-avoided">
-                    {impact.weeklyCo2AvoidedKg} kg
-                  </p>
-                  <p className="text-[11px] text-slate-500">
-                    {impact.weeklyPmAvoidedGrams} g PM2.5 avoided
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500">Winter Season</p>
-                  <p className="mt-1 font-mono text-base font-semibold text-teal-800 tabular-nums">
-                    {impact.winterSeasonCo2AvoidedKg} kg
-                  </p>
-                  <p className="text-[11px] text-slate-500">13-wk community cut</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 flex items-start gap-2 border-t border-slate-100 pt-4 text-xs leading-relaxed text-slate-600">
-              <Leaf className="mt-0.5 h-4 w-4 shrink-0 text-teal-700" aria-hidden="true" />
-              <p>
-                {selectedChoiceIds.length === 0
-                  ? 'Adopt one or more choices on the left to quantify your indoor particulate drop and weekly neighborhood emissions reduction.'
-                  : `Your selections lower daily inhaled fine particulates from ${impact.baselineDailyDoseUg} µg to ${impact.mitigatedDailyDoseUg} µg per person (equivalent to avoiding ${impact.cigaretteEquivalentsAvoided} cigarettes/day of smoke exposure).`}
-              </p>
-            </div>
-          </div>
+          <HouseholdImpactCard
+            impact={impact}
+            cityName={cityName}
+            selectedCount={selectedChoiceIds.length}
+            isReferenceCity={isReferenceCity}
+            onResetChoices={onResetChoices}
+          />
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
             <ResilientEditorialImage
@@ -389,4 +292,4 @@ export function ImpactLabSection({
       </div>
     </section>
   );
-}
+});

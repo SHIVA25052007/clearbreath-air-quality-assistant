@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PRESET_CITIES } from './airQuality';
+import { PRESET_CITIES } from '../data/presetCities';
 import { calculateHouseholdImpact, DEFAULT_HOUSEHOLD_PROFILE } from './impactCalculator';
 import {
   sanitizeTextInput,
@@ -96,6 +96,34 @@ test('validateLocationTelemetry accepts all presets and rejects malformed or out
     validateLocationTelemetry({
       ...sampleTelemetry,
       weeklyTrend: [{ ...sampleTelemetry.weeklyTrend[0], avgUsAqi: 9999 }],
+    }).valid,
+    false
+  );
+  assert.equal(
+    validateLocationTelemetry({
+      ...sampleTelemetry,
+      city: 'Delhi <script>alert(1)</script>',
+    }).valid,
+    false
+  );
+  assert.equal(
+    validateLocationTelemetry({
+      ...sampleTelemetry,
+      observedAtIso: 'not-an-iso-date',
+    }).valid,
+    false
+  );
+  assert.equal(
+    validateLocationTelemetry({
+      ...sampleTelemetry,
+      estimatedFields: ['NO2', 'Wind'],
+    }).valid,
+    true
+  );
+  assert.equal(
+    validateLocationTelemetry({
+      ...sampleTelemetry,
+      estimatedFields: ['bad<field>'],
     }).valid,
     false
   );

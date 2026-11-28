@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Send, RefreshCw, AlertCircle } from 'lucide-react';
+import { memo, useState, type FormEvent } from 'react';
+import { AlertCircle, RefreshCw, Send } from 'lucide-react';
 import type { AiActionPlan, AiPlanItem, ChatMessage } from '../types/airQuality';
 
 interface AiPlannerAndAdvisorProps {
@@ -33,12 +33,12 @@ function PlanColumn({
     <div className="flex flex-col rounded-xl border border-slate-200 bg-white p-5">
       <div className="border-b border-slate-100 pb-3">
         <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-        <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>
+        <p className="mt-0.5 text-xs text-slate-600">{subtitle}</p>
       </div>
       <div className="mt-4 space-y-4 divide-y divide-slate-100">
         {items.map((item, idx) => (
           <div key={idx} className={idx > 0 ? 'pt-4' : ''}>
-            <p className="font-mono text-[11px] font-medium text-teal-800">
+            <p className="font-mono text-xs font-medium text-teal-800">
               {item.timingOrLocation}
             </p>
             <h4 className="mt-1 text-sm font-semibold text-slate-900">{item.title}</h4>
@@ -54,7 +54,7 @@ function PlanColumn({
   );
 }
 
-export function AiPlannerAndAdvisor({
+export const AiPlannerAndAdvisor = memo(function AiPlannerAndAdvisor({
   cityName,
   plan,
   isGeneratingPlan,
@@ -67,7 +67,7 @@ export function AiPlannerAndAdvisor({
 }: AiPlannerAndAdvisorProps) {
   const [question, setQuestion] = useState('');
 
-  const handleChatSubmit = (e: React.FormEvent) => {
+  const handleChatSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!question.trim() || isSendingChat) return;
     onSendChat(question.trim());
@@ -86,7 +86,7 @@ export function AiPlannerAndAdvisor({
             03. GenAI Tailored Routine &amp; Family Advisor
           </h2>
           <p className="mt-1 max-w-2xl text-sm text-slate-600">
-            Synthesizes {cityName}’s live hourly smog curve, your home enclosure, and commute choices into a clear, step-by-step daily plan.
+            Synthesizes {cityName}’s hourly smog curve, your home enclosure, and commute choices into a tailored daily plan with modeled impact estimates.
           </p>
         </div>
 
@@ -122,7 +122,13 @@ export function AiPlannerAndAdvisor({
       )}
 
       {isGeneratingPlan && !plan && (
-        <div className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3" aria-label="Generating AI plan">
+        <div
+          role="status"
+          aria-live="polite"
+          aria-label="Generating tailored AI action plan"
+          className="mt-6 grid grid-cols-1 gap-6 md:grid-cols-3"
+        >
+          <span className="sr-only">Generating tailored AI action plan for {cityName}...</span>
           {[0, 1, 2].map((skeletonIdx) => (
             <div
               key={skeletonIdx}
@@ -203,12 +209,12 @@ export function AiPlannerAndAdvisor({
           <h3 className="text-base font-semibold text-slate-900">
             Ask the Urban Air Quality Advisor
           </h3>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-slate-600">
             Grounded in {cityName}’s current AQI, 24-hour curve, and your household choices
           </p>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2" aria-label="Quick question starters">
+        <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Quick question starters">
           {STARTER_PROMPTS.map((starter) => (
             <button
               key={starter}
@@ -224,10 +230,10 @@ export function AiPlannerAndAdvisor({
 
         <div
           aria-live="polite"
-          className="mt-4 max-h-80 space-y-3 overflow-y-auto rounded-lg border border-slate-100 bg-slate-50 p-4"
+          className="mt-4 max-h-80 space-y-3 overflow-y-auto rounded-lg border border-slate-200 bg-slate-50 p-4"
         >
           {chatMessages.length === 0 ? (
-            <p className="text-xs leading-relaxed text-slate-500">
+            <p className="text-xs leading-relaxed text-slate-600">
               Ask about window ventilation timing, DIY Corsi-Rosenthal filter sizing, safe school commutes, or neighborhood carpooling ideas.
             </p>
           ) : (
@@ -240,7 +246,7 @@ export function AiPlannerAndAdvisor({
                     : 'mr-auto max-w-2xl border border-slate-200 bg-white text-slate-800 whitespace-pre-line'
                 }`}
               >
-                <p className="mb-1 text-[11px] font-medium text-slate-500">
+                <p className="mb-1 text-xs font-medium text-slate-600">
                   {msg.role === 'user' ? 'Your Household' : 'ClearBreath Advisor'}
                 </p>
                 {msg.text}
@@ -248,7 +254,7 @@ export function AiPlannerAndAdvisor({
             ))
           )}
           {isSendingChat && (
-            <p className="text-xs font-medium text-teal-800">
+            <p role="status" className="text-xs font-medium text-teal-800">
               Analyzing local conditions and calculating exposure impact...
             </p>
           )}
@@ -273,7 +279,7 @@ export function AiPlannerAndAdvisor({
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             placeholder={`Ask about ${cityName} smog, indoor hacks, or commute swaps...`}
-            className="min-h-[44px] flex-1 rounded-lg border border-slate-300 bg-white px-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-teal-700 focus:outline-none"
+            className="min-h-[44px] flex-1 rounded-lg border border-slate-300 bg-white px-3.5 text-sm text-slate-900 placeholder:text-slate-500 focus:border-teal-700"
           />
           <button
             type="submit"
@@ -287,4 +293,4 @@ export function AiPlannerAndAdvisor({
       </div>
     </section>
   );
-}
+});

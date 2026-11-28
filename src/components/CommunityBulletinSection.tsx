@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Copy, Check } from 'lucide-react';
+import { memo, useState } from 'react';
+import { Check, Copy } from 'lucide-react';
 import type { AiActionPlan, ImpactSummary, LocationTelemetry } from '../types/airQuality';
 import { findCleanestVentilationWindow, getAqiCategory } from '../utils/airQuality';
 
@@ -9,7 +9,7 @@ interface CommunityBulletinSectionProps {
   plan: AiActionPlan | null;
 }
 
-export function CommunityBulletinSection({
+export const CommunityBulletinSection = memo(function CommunityBulletinSection({
   telemetry,
   impact,
   plan,
@@ -17,10 +17,11 @@ export function CommunityBulletinSection({
   const [copied, setCopied] = useState(false);
   const aqiInfo = getAqiCategory(telemetry.usAqi);
   const vent = findCleanestVentilationWindow(telemetry.hourly);
+  const sourceLabel = telemetry.dataSource === 'preset' ? 'Reference Sample' : 'Observed';
 
   const bulletinText = plan?.communityNotice
-    ? `${plan.communityNotice}\n\n[${telemetry.city} Clean-Air Snapshot: US AQI ${telemetry.usAqi} (${aqiInfo.label}) · Best airing window ${vent.startLabel}–${vent.endLabel} · Modeled household cut: -${impact.doseReductionPct}% PM2.5 dose & ${impact.weeklyCo2AvoidedKg} kg CO₂e/week avoided]`
-    : `${telemetry.city} Neighborhood Clean-Air Advisory: Current US AQI is ${telemetry.usAqi} (${aqiInfo.label}) with PM2.5 at ${telemetry.pm25.toFixed(1)} µg/m³ and ${telemetry.inversionRisk} winter inversion risk. Keep windows closed during morning/evening peaks and limit cross-ventilation to ${vent.startLabel}–${vent.endLabel} (~${vent.avgPm25} µg/m³). Together, shifting 3+ weekly car trips to transit and stopping engine idling at school gates avoids ~${Math.max(12, impact.weeklyCo2AvoidedKg)} kg CO₂e per household each week.`;
+    ? `${plan.communityNotice}\n\n[${telemetry.city} Clean-Air Snapshot (${sourceLabel}): US AQI ${telemetry.usAqi} (${aqiInfo.label}) · Best airing window ${vent.startLabel}–${vent.endLabel} · Modeled household cut: -${impact.doseReductionPct}% PM2.5 dose & ~${impact.weeklyCo2AvoidedKg} kg CO₂e/week avoided]`
+    : `${telemetry.city} Neighborhood Clean-Air Advisory (${sourceLabel}): US AQI is ${telemetry.usAqi} (${aqiInfo.label}) with PM2.5 at ${telemetry.pm25.toFixed(1)} µg/m³ and ${telemetry.inversionRisk} winter inversion risk. Keep windows closed during morning/evening peaks and limit cross-ventilation to ${vent.startLabel}–${vent.endLabel} (~${vent.avgPm25} µg/m³). Together, shifting 3+ weekly car trips to transit and stopping engine idling at school gates avoids an estimated ~${Math.max(12, impact.weeklyCo2AvoidedKg)} kg CO₂e per household each week.`;
 
   const handleCopy = async () => {
     try {
@@ -65,6 +66,9 @@ export function CommunityBulletinSection({
               </>
             )}
           </button>
+          <span className="sr-only" aria-live="polite">
+            {copied ? 'Community bulletin copied to clipboard.' : ''}
+          </span>
         </div>
 
         <blockquote className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-relaxed text-slate-800 whitespace-pre-line">
@@ -73,4 +77,4 @@ export function CommunityBulletinSection({
       </div>
     </section>
   );
-}
+});
